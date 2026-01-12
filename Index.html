@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>3 Tier App</title>
+</head>
+<body>
+  <h2>Message from Backend</h2>
+  <div id="msg">Loading...</div>
+
+  <script>
+    fetch("http://BACKEND_IP:3000/message")
+      .then(res => res.text())
+      .then(data => {
+        document.getElementById("msg").innerText = data;
+      });
+  </script>
+</body>
+</html>
