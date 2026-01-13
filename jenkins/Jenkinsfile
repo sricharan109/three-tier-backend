@@ -2,10 +2,14 @@ pipeline {
   agent any
 
   environment {
+    // Docker
     IMAGE_NAME = "sricharanns/three-tier-backend"
     IMAGE_TAG  = "${BUILD_NUMBER}"
     CONTAINER  = "backend-app"
-    BACKEND_IP = "PRIVATE_IP_OF_BACKEND_EC2"
+
+    // EC2 IPs
+    BACKEND_EC2  = "PRIVATE_IP_OF_BACKEND_EC2"
+    FRONTEND_EC2 = "PUBLIC_IP_OF_FRONTEND_EC2"
   }
 
   stages {
@@ -17,10 +21,10 @@ pipeline {
       }
     }
 
-    stage('Build Docker Image') {
+    stage('Build Backend Docker Image') {
       steps {
         sh '''
-          docker build -t $IMAGE_NAME:$IMAGE_TAG .
+          docker build -t $IMAGE_NAME:$IMAGE_TAG -f docker/Dockerfile .
         '''
       }
     }
@@ -40,19 +44,33 @@ pipeline {
       }
     }
 
-    stage('Deploy to Backend EC2') {
+    stage('Deploy Backend to Backend EC2') {
+  steps {
+    sshagent(['backend-ssh']) {
+      sh '''
+        ssh -o StrictHostKeyChecking=no ubuntu@$BACKEND_EC2 << EOF
+          docker pull $IMAGE_NAME:$IMAGE_TAG
+          docker stop $CONTAINER || true
+          docker rm $CONTAINER || true
+          docker run -d \
+            --name $CONTAINER \
+            -p 3000:3000 \
+            -e DB_HOST=mydb.xxxxxx.ap-south-1.rds.amazonaws.com \
+            -e DB_USER=admin \
+            -e DB_PASS=password \
+            -e DB_NAME=appdb \
+            $IMAGE_NAME:$IMAGE_TAG
+        EOF
+      '''
+    }
+  }
+}
+    stage('Deploy Frontend to Frontend EC2') {
       steps {
-        sshagent(['backend-ssh']) {
+        sshagent(['frontend-ssh']) {
           sh '''
-            ssh -o StrictHostKeyChecking=no ubuntu@$BACKEND_IP << EOF
-              docker pull $IMAGE_NAME:$IMAGE_TAG
-              docker stop $CONTAINER || true
-              docker rm $CONTAINER || true
-              docker run -d \
-                -p 3000:3000 \
-                --name $CONTAINER \
-                $IMAGE_NAME:$IMAGE_TAG
-            EOF
+            scp -o StrictHostKeyChecking=no frontend/index.html \
+            ubuntu@$FRONTEND_EC2:/var/www/html/index.html
           '''
         }
       }
