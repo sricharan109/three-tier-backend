@@ -44,28 +44,28 @@ pipeline {
         }
       }
     }
-
-    stage('Deploy Backend to Backend EC2') {
+  stage('Deploy Backend to Backend EC2') {
   steps {
     sshagent(['backend-ssh']) {
-      sh '''
-        ssh -o StrictHostKeyChecking=no ubuntu@$BACKEND_EC2 << EOF
-          docker pull $IMAGE_NAME:$IMAGE_TAG
-          docker stop $CONTAINER || true
-          docker rm $CONTAINER || true
+      sh """
+        ssh -o StrictHostKeyChecking=no ubuntu@${BACKEND_EC2} '
+          docker pull ${IMAGE_NAME}:${IMAGE_TAG} &&
+          docker stop ${CONTAINER} || true &&
+          docker rm ${CONTAINER} || true &&
           docker run -d \
-            --name $CONTAINER \
+            --name ${CONTAINER} \
             -p 3000:3000 \
             -e DB_HOST=mydb.xxxxxx.ap-south-1.rds.amazonaws.com \
             -e DB_USER=admin \
-            -e DB_PASS=$DB_PASS \
+            -e DB_PASS=${DB_PASS} \
             -e DB_NAME=appdb \
-            $IMAGE_NAME:$IMAGE_TAG
-        EOF
-      '''
+            ${IMAGE_NAME}:${IMAGE_TAG}
+        '
+      """
     }
   }
 }
+
 
     stage('Deploy Frontend to Frontend EC2') {
       steps {
