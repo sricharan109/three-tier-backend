@@ -8,7 +8,7 @@
   <div id="msg">Loading...</div>
 
   <script>
-    fetch("http://BACKEND_IP:3000/message")
+    fetch("http://three-tier-alb-528449831.us-east-1.elb.amazonaws.com/message")
       .then(res => res.text())
       .then(data => {
         document.getElementById("msg").innerText = data;

@@ -8,8 +8,9 @@ pipeline {
     CONTAINER  = "backend-app"
 
     // EC2 IPs
-    BACKEND_EC2  = "PRIVATE_IP_OF_BACKEND_EC2"
-    FRONTEND_EC2 = "PUBLIC_IP_OF_FRONTEND_EC2"
+    BACKEND_EC2  = "10.0.3.212"
+    FRONTEND_EC2 = "3.235.95.194"
+    DB_PASS = credentials('db-pass')
   }
 
   stages {
@@ -57,7 +58,7 @@ pipeline {
             -p 3000:3000 \
             -e DB_HOST=mydb.xxxxxx.ap-south-1.rds.amazonaws.com \
             -e DB_USER=admin \
-            -e DB_PASS=password \
+            -e DB_PASS=$DB_PASS \
             -e DB_NAME=appdb \
             $IMAGE_NAME:$IMAGE_TAG
         EOF
@@ -65,6 +66,7 @@ pipeline {
     }
   }
 }
+
     stage('Deploy Frontend to Frontend EC2') {
       steps {
         sshagent(['frontend-ssh']) {
