@@ -2,14 +2,13 @@ pipeline {
   agent any
 
   environment {
-    // Docker
     IMAGE_NAME = "sricharanns/three-tier-backend"
     IMAGE_TAG  = "${BUILD_NUMBER}"
     CONTAINER  = "backend-app"
 
-    // EC2 IPs
     BACKEND_EC2  = "10.0.3.212"
     FRONTEND_EC2 = "3.235.95.194"
+
     DB_PASS = credentials('db-pass')
   }
 
@@ -44,43 +43,44 @@ pipeline {
         }
       }
     }
-  stage('Deploy Backend to Backend EC2') {
-  steps {
-    sshagent(['backend-ssh']) {
-      sh """
-        ssh -o StrictHostKeyChecking=no ubuntu@${BACKEND_EC2} '
-          docker pull ${IMAGE_NAME}:${IMAGE_TAG} &&
-          docker stop ${CONTAINER} || true &&
-          docker rm ${CONTAINER} || true &&
-          docker run -d \
-            --name ${CONTAINER} \
-            -p 3000:3000 \
-            -e DB_HOST=mydb.xxxxxx.ap-south-1.rds.amazonaws.com \
-            -e DB_USER=admin \
-            -e DB_PASS=${DB_PASS} \
-            -e DB_NAME=appdb \
-            ${IMAGE_NAME}:${IMAGE_TAG}
-        '
-      """
+
+    stage('Deploy Backend to Backend EC2') {
+      steps {
+        sshagent(['backend-ssh']) {
+          sh """
+            ssh -o StrictHostKeyChecking=no ubuntu@${BACKEND_EC2} '
+              docker pull ${IMAGE_NAME}:${IMAGE_TAG} &&
+              docker stop ${CONTAINER} || true &&
+              docker rm ${CONTAINER} || true &&
+              docker run -d \
+                --name ${CONTAINER} \
+                -p 3000:3000 \
+                -e DB_HOST=three-tier-dbs.cuhao8aouanz.us-east-1.rds.amazonaws.com \
+                -e DB_USER=admin \
+                -e DB_PASS=${DB_PASS} \
+                -e DB_NAME=appdb \
+                ${IMAGE_NAME}:${IMAGE_TAG}
+            '
+          """
+        }
+      }
     }
-  }
-}
 
+    stage('Deploy Frontend to Frontend EC2') {
+      steps {
+        sshagent(['frontend-ssh']) {
+          sh """
+            scp -o StrictHostKeyChecking=no frontend/index.html \
+            ubuntu@${FRONTEND_EC2}:/tmp/index.html
 
-stage('Deploy Frontend to Frontend EC2') {
-  steps {
-    sshagent(['frontend-ssh']) {
-      sh """
-        scp -o StrictHostKeyChecking=no frontend/index.html \
-        ubuntu@${FRONTEND_EC2}:/tmp/index.html
-
-        ssh -o StrictHostKeyChecking=no ubuntu@${FRONTEND_EC2} '
-          sudo mv /tmp/index.html /var/www/html/index.html &&
-          sudo chown root:root /var/www/html/index.html
-        '
-      """
+            ssh -o StrictHostKeyChecking=no ubuntu@${FRONTEND_EC2} '
+              sudo mv /tmp/index.html /var/www/html/index.html &&
+              sudo chown root:root /var/www/html/index.html
+            '
+          """
+        }
+      }
     }
+
   }
-}  
-}
 }
