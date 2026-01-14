@@ -67,15 +67,20 @@ pipeline {
 }
 
 
-    stage('Deploy Frontend to Frontend EC2') {
-      steps {
-        sshagent(['frontend-ssh']) {
-          sh '''
-            scp -o StrictHostKeyChecking=no frontend/index.html \
-            ubuntu@$FRONTEND_EC2:/var/www/html/index.html
-          '''
-        }
-      }
+stage('Deploy Frontend to Frontend EC2') {
+  steps {
+    sshagent(['frontend-ssh']) {
+      sh """
+        scp -o StrictHostKeyChecking=no frontend/index.html \
+        ubuntu@${FRONTEND_EC2}:/tmp/index.html
+
+        ssh -o StrictHostKeyChecking=no ubuntu@${FRONTEND_EC2} '
+          sudo mv /tmp/index.html /var/www/html/index.html &&
+          sudo chown root:root /var/www/html/index.html
+        '
+      """
     }
   }
+}  
+}
 }
