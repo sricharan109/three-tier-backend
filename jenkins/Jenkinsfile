@@ -1,18 +1,47 @@
 pipeline {
   agent any
 
+  parameters {
+    choice(
+      name: 'ENV',
+      choices: ['dev', 'stage', 'prod'],
+      description: 'Select environment to deploy'
+    )
+  }
+
   environment {
     IMAGE_NAME = "sricharanns/three-tier-backend"
     IMAGE_TAG  = "${BUILD_NUMBER}"
-    CONTAINER  = "backend-app"
 
-    BACKEND_EC2  = "10.0.3.212"
+    BACKEND_EC2 = "10.0.3.212"
     FRONTEND_EC2 = "3.235.95.194"
 
+    DB_HOST = "three-tier-dbs.cuhao8aouanz.us-east-1.rds.amazonaws.com"
+    DB_USER = "admin"
+    DB_NAME = "appdb"
     DB_PASS = credentials('db-pass')
   }
 
   stages {
+
+    stage('Prepare Environment Config') {
+      steps {
+        script {
+          if (params.ENV == 'dev') {
+            env.CONTAINER_NAME = 'backend-dev'
+            env.APP_PORT = '3001'
+          }
+          else if (params.ENV == 'stage') {
+            env.CONTAINER_NAME = 'backend-stage'
+            env.APP_PORT = '3002'
+          }
+          else {
+            env.CONTAINER_NAME = 'backend-prod'
+            env.APP_PORT = '3000'
+          }
+        }
+      }
+    }
 
     stage('Checkout Code') {
       steps {
@@ -23,9 +52,9 @@ pipeline {
 
     stage('Build Backend Docker Image') {
       steps {
-        sh '''
-          docker build -t $IMAGE_NAME:$IMAGE_TAG -f docker/Dockerfile .
-        '''
+        sh """
+          docker build -t ${IMAGE_NAME}:${IMAGE_TAG} -f docker/Dockerfile .
+        """
       }
     }
 
@@ -36,29 +65,29 @@ pipeline {
           usernameVariable: 'DOCKER_USER',
           passwordVariable: 'DOCKER_PASS'
         )]) {
-          sh '''
-            echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin
-            docker push $IMAGE_NAME:$IMAGE_TAG
-          '''
+          sh """
+            echo ${DOCKER_PASS} | docker login -u ${DOCKER_USER} --password-stdin
+            docker push ${IMAGE_NAME}:${IMAGE_TAG}
+          """
         }
       }
     }
 
-    stage('Deploy Backend to Backend EC2') {
+    stage('Deploy Backend') {
       steps {
         sshagent(['backend-ssh']) {
           sh """
             ssh -o StrictHostKeyChecking=no ubuntu@${BACKEND_EC2} '
               docker pull ${IMAGE_NAME}:${IMAGE_TAG} &&
-              docker stop ${CONTAINER} || true &&
-              docker rm ${CONTAINER} || true &&
+              docker stop ${CONTAINER_NAME} || true &&
+              docker rm ${CONTAINER_NAME} || true &&
               docker run -d \
-                --name ${CONTAINER} \
-                -p 3000:3000 \
-                -e DB_HOST=three-tier-dbs.cuhao8aouanz.us-east-1.rds.amazonaws.com \
-                -e DB_USER=admin \
+                --name ${CONTAINER_NAME} \
+                -p ${APP_PORT}:3000 \
+                -e DB_HOST=${DB_HOST} \
+                -e DB_USER=${DB_USER} \
                 -e DB_PASS=${DB_PASS} \
-                -e DB_NAME=appdb \
+                -e DB_NAME=${DB_NAME} \
                 ${IMAGE_NAME}:${IMAGE_TAG}
             '
           """
@@ -66,7 +95,10 @@ pipeline {
       }
     }
 
-    stage('Deploy Frontend to Frontend EC2') {
+    stage('Deploy Frontend') {
+      when {
+        expression { params.ENV == 'prod' }
+      }
       steps {
         sshagent(['frontend-ssh']) {
           sh """
@@ -81,6 +113,5 @@ pipeline {
         }
       }
     }
-
   }
 }
