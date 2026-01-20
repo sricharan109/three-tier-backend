@@ -14,7 +14,7 @@ pipeline {
     IMAGE_TAG  = "${BUILD_NUMBER}"
 
     BACKEND_EC2 = "10.0.3.212"
-    FRONTEND_EC2 = "3.235.95.194"
+    FRONTEND_EC2 = "100.29.191.231"
 
     DB_HOST = "three-tier-dbs.cuhao8aouanz.us-east-1.rds.amazonaws.com"
     DB_USER = "admin"
